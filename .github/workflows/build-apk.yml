@@ -1,0 +1,58 @@
+
+name: Build TapPulse APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK
+        run: |
+          sdkmanager "platforms;android-36.1" "build-tools;36.0.0"
+
+      - name: Extract TapPulse project
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -name '*.zip' -print -quit)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ZIP project tidak ditemukan"
+            exit 1
+          fi
+          mkdir source
+          unzip -q "$ZIP_FILE" -d source
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Prepare debug signing
+        run: |
+          sed -i '/signingConfig = signingConfigs.getByName("debugConfig")/d' source/app/build.gradle.kts
+
+      - name: Build APK
+        run: |
+          cd source
+          gradle --no-daemon :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TapPulse-APK
+          path: source/app/build/outputs/apk/debug/app-debug.apk
